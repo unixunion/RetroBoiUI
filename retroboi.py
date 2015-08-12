@@ -7,7 +7,7 @@ RetroBoi is a simple light weight python interface for retropi like projects.
 
 DEPENDENCIES
 
-* npyscreen
+* npyscreen==4.9.1
 
 INSTALL
 
@@ -36,6 +36,18 @@ command = /usr/bin/retroarch -L /path/to/libretro.core -c /path/to/global.conf -
 
 %s is passed the rom path and filename (sh_escaped)
 command can be anything, I prefer to use runcommand.sh commands here.
+see emulationstation/es_systems.cfg and just copy the filter and command
+from there, change %ROM$ for %s, and bob's ur uncle.
+
+CONTROLS IMPLEMENTED
+
+"a" button selects a game
+"i" button changes system
+"-" quits
+"+" reloads
+arrow keys nav up and down
+
+rom codes
 
 '''
 
@@ -48,9 +60,13 @@ import npyscreen, curses
 # variables
 
 # top level romdir with SYSTEM subdirs
-romdir = '/home/pi/RetroPie/roms'
+romdir = 'roms'
 
-logging.basicConfig(filename='%s/retroboi.log' % romdir,level=logging.DEBUG)
+try:
+    logging.basicConfig(filename='%s/retroboi.log' % romdir,level=logging.DEBUG)
+except Exception, e:
+    print("Unable to open logfile, disabling logging")
+    pass
 
 # button mappings for interface ( arrow keys for nav assumed )
 a_button = "a"
@@ -59,6 +75,7 @@ select_button = "o"
 start_button = "p"
 escape_button = "-"
 reload_button = "+"
+menu_button = "KEY_F(1)"
 
 # the config file name to look for per SYSTEM romdir
 system_config_file = "default.cfg"
@@ -91,29 +108,41 @@ class MainForm(npyscreen.FormMultiPage):
 
     def create(self):
         # load system config
-        logging.debug("requsting system config for %s" % self.name)
+        logging.debug("requesting system config for %s" % self.name)
         self.config = getSystemConfig(self.name)
 
-	if self.config.has_section("default"):
+        # The menus are created here.
+        # self.m1 = self.add_menu(name="Main Menu", shortcut="^M")
+        # self.m1.addItemsFromList([
+        #     ("Shutdown", self.shutdown, None, None, ("some text",)),
+        #     ("Reboot",   self.reboot, "e"),
+        #     ("Exit Application", self.exit_application, "é"),
+        # ])
 
+        if self.config.has_section("default"):
             logging.debug("adding %s roms to UI" % self.name)
+
+            item_count_max = terminal_height - 4
+            item_count = 0
+
             for rom in getSystemRoms(self.name, self.config):
                 # setup the callback function with the command
                 cb[rom] = runGame(self.config.get('default', 'command') % sh_escape(getSystemRomDir(self.name) + "/" + rom))
-                self.add_widget_intelligent(RomButtonPress, name=rom[:terminal_width-13], when_pressed_function=cb[rom], color='WHITE')
+
+                self.add(RomButtonPress, name=rom[:terminal_width-13], when_pressed_function=cb[rom], color='WHITE')
+                item_count = item_count + 1
+                if item_count >= item_count_max:
+                    item_count=0
+                    self.add_page()
+
+                # TODO FIXME when inteligence available in MultiPageWithMenus
+                #self.add_widget_intelligent(RomButtonPress, name=rom[:terminal_width-13], when_pressed_function=cb[rom], color='WHITE')
 
         # input handler
         logging.debug("binding %s to system_select" % select_button)
         self.add_handlers({select_button: self.change_forms})
         self.add_handlers({escape_button: self.exit_application})
         self.add_handlers({reload_button: reload})
-
-        #self.m1 = self.new_menu(name="Menu", shortcut=start_button)# TODO FIXME COMPLAIN ABOUT THIS!
-        #self.m1.addItemsFromList([
-        #    ("Shutdown", self.shutdown, "e"),
-        #    ("Reboot", self.reboot, "e"),
-        #    ("Exit Application", self.exit_application, "é"),
-        #])
 
     def on_ok(self):
         # Exit the application if the OK button is pressed.
@@ -176,6 +205,7 @@ class RomButtonPress(npyscreen.wgbutton.MiniButton):
 
     def whenPressed(self):
         pass
+
 
 """
 return the roms in the SYSTEM directory
@@ -251,8 +281,10 @@ def start(*args, **kwargs):
     logging.info("Detected Systems: " + str(systems))
 
     App = RetroBoiApp()
-    App.run()
-
+    try:
+        App.run()
+    except KeyError:
+        print("unable to instantiate systems, is 'Main' dir present in romdir with default.cfg?")
 def reload(*args, **kwargs):
     systems = []
     start()
