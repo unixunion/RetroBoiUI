@@ -3,7 +3,7 @@
 
 '''
 
-RetroBoi is a simple light weight python interface for retropi like projects.
+RetroBoi is a simple lightweight python interface for retropi like projects.
 
 DEPENDENCIES
 
@@ -17,27 +17,29 @@ I suggest using a virtual environment.
 #> virtualenv ~/py27
 #> . ~/py27/bin/activate
 #> pip install npyscreen
-#> cp retroboi.py ~/
-
-create a ~/retroboi.sh file:
-
-    #!/bin/sh
-    . ~/py27/bin/activate
-    python ~/retroboi.py
+#> cp retroboi.py retroboi.sh ~/
 
 CONFIGURING
 
-1. Set the romdir variable
-2. Add a default.cfg in each "system" directory within the romdir. e.g. `romdir`/snes/default.cfg
+1. Set the `romdir` variable
+2. Add a default.cfg in each "system" directory within the romdir. e.g.
+    `romdir`/snes/default.cfg
 
 [default]
 filter = .bin .BIN .zip .ZIP
-command = /usr/bin/retroarch -L /path/to/libretro.core -c /path/to/global.conf --appendconfig /path/to/megadrive.cfg %s
+command = /usr/bin/retroarch -L /path/to/libretro.core -c /path/to/global.conf
+    --appendconfig /path/to/megadrive.cfg %s
 
 %s is passed the rom path and filename (sh_escaped)
+
 command can be anything, I prefer to use runcommand.sh commands here.
 see emulationstation/es_systems.cfg and just copy the filter and command
-from there, change %ROM$ for %s, and bob's ur uncle.
+from there, change `%ROM$`` for %s, and bob's ur uncle.
+
+STARTUP
+
+add the retroboi.sh as the executable to call instead of emulationstation in
+either /etc/profile or bashrc, depending on what you are using.
 
 CONTROLS IMPLEMENTED
 
@@ -75,7 +77,7 @@ select_button = "o"
 start_button = "p"
 escape_button = "-"
 reload_button = "+"
-menu_button = "KEY_F(1)"
+# menu_button = "KEY_F(1)"
 
 # the config file name to look for per SYSTEM romdir
 system_config_file = "default.cfg"
@@ -104,13 +106,14 @@ class RetroBoiApp(npyscreen.NPSAppManaged):
     def onCleanExit(self):
         npyscreen.notify_wait("Goodbye!")
 
+
 class MainForm(npyscreen.FormMultiPage):
 
     def create(self):
         # load system config
         logging.debug("requesting system config for %s" % self.name)
         self.config = getSystemConfig(self.name)
-
+        #self.page = 0
         # The menus are created here.
         # self.m1 = self.add_menu(name="Main Menu", shortcut="^M")
         # self.m1.addItemsFromList([
@@ -143,6 +146,23 @@ class MainForm(npyscreen.FormMultiPage):
         self.add_handlers({select_button: self.change_forms})
         self.add_handlers({escape_button: self.exit_application})
         self.add_handlers({reload_button: reload})
+        # self.add_handlers({curses.KEY_NPAGE: self.page_down})
+
+        # self.handlers = {
+        #     curses.ascii.NL:   self.h_exit_down,
+        #     curses.ascii.CR:   self.h_exit_down,
+        #     curses.ascii.TAB:  self.h_exit_down,
+        #     curses.KEY_DOWN:   self.h_exit_down,
+        #     curses.KEY_UP:     self.h_exit_up,
+        #     # curses.KEY_LEFT:   self.page_up,
+        #     # curses.KEY_RIGHT:  self.page_down,
+        #     curses.ascii.ESC:  self.h_exit_escape,
+        #     curses.KEY_MOUSE:  self.h_exit_mouse,
+        #     select_button:     self.change_forms,
+        #     escape_button:     self.exit_application,
+        #     reload_button:     reload,
+        #     # curses.KEY_NPAGE:  self.page_down
+        # }
 
     def on_ok(self):
         # Exit the application if the OK button is pressed.
@@ -157,6 +177,23 @@ class MainForm(npyscreen.FormMultiPage):
             logging.debug("setting system to %s" % change_to)
 
         self.parentApp.change_form(change_to)
+
+    # def page_down(self, *args, **kwargs):
+    #     self.page = self.page+1
+    #     try:
+    #         self.switch_page(self.page)
+    #     except:
+    #         self.page=0
+    #         self.switch_page(self.page)
+    #
+    # def page_up(self, *args, **kwargs):
+    #     if self.page > 0:
+    #         self.page = self.page-1
+    #         try:
+    #             self.switch_page(self.page)
+    #         except:
+    #             self.page=0
+    #             self.switch_page(self.page)
 
     def shutdown(self):
         logging.debug("shutdown")
@@ -205,6 +242,7 @@ class RomButtonPress(npyscreen.wgbutton.MiniButton):
 
     def whenPressed(self):
         pass
+
 
 
 """
@@ -283,9 +321,13 @@ def start(*args, **kwargs):
     App = RetroBoiApp()
     try:
         App.run()
-    except KeyError:
+    except KeyError as e:
         print("unable to instantiate systems, is 'Main' dir present in romdir with default.cfg?")
+        print(str(e.message))
+
+
 def reload(*args, **kwargs):
+    npyscreen.notify_wait("Reloading...")
     systems = []
     start()
 
